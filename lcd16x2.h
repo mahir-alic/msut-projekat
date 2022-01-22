@@ -17,6 +17,9 @@ void initLCD();
 void printLCD(char * str, ... );
 void posCursor(uint8_t, uint8_t);
 void eraseNChar(uint8_t);
+void printLCDFloat(float);
+
+
 
 
 

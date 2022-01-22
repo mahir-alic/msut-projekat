@@ -1,5 +1,6 @@
 #include "lcd16x2.h"
 
+
 uint8_t r=1,c=1;
 
 void initLCD(){
@@ -216,3 +217,16 @@ void printLCD(char *str, ... )
 	va_end(vl);
 	return;
 }
+
+printLCDFloat(float x){
+	int dec=x;
+	
+	
+	int frac=abs(round((x-dec)*100));
+	
+		
+	if(x>-1.0 && x<0.0) printLCD("-%d.%d",dec,frac);
+	else printLCD("%d.%d",dec,frac);
+}
+
+
