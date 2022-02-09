@@ -4,7 +4,7 @@
 uint8_t r=1,c=1;
 
 void initLCD(){
-	initUSART2(USART2_BAUDRATE_115200);
+	initUSART2(USART2_BAUDRATE_921600);
 	
 	//clearScreen();
 	putcharUSART2(0x1B);
