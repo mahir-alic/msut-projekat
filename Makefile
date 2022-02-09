@@ -11,6 +11,8 @@ SRCS += delay.c
 SRCS += usart.c
 SRCS += misc.c
 SRCS += adc.c
+SRCS += lcd16x2.c
+SRCS += rot-enc.c
 
 # Normally you shouldn't need to change anything below this line!
 #######################################################################################
@@ -45,7 +47,7 @@ $(PROJ_NAME).elf: $(SRCS)
 	$(OBJCOPY) -O binary $(PROJ_NAME).elf $(PROJ_NAME).bin
 	$(SIZE) -B  $(PROJ_NAME).elf
 	ls -l $(PROJ_NAME).bin
-	@./build
+	
 
 
 clean:
