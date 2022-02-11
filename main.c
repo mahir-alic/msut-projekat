@@ -16,9 +16,11 @@
 #define IRQ_CNT
 
 volatile uint32_t g_irq_cnt = 0;
-volatile uint8_t g_gpiod_irq_state = (IRQ_IDLE);
+volatile uint8_t g_gpioc_irq_state = (IRQ_IDLE);
 volatile uint32_t g_irq_timer = 0;
 uint8_t reMode=ADJUST;
+uint8_t getNumLenght(int);
+void printNumLCD(int line,int pos,int x);
 
 
 int main(void){
@@ -59,8 +61,9 @@ int main(void){
 	uint8_t state=0;
 	uint8_t chg=0;
 	uint8_t speed=17;
-	uint8_t distance=12000;
-	uint8_t temperature=30;
+	uint32_t distance=12000;
+	int temperature=30;
+	uint16_t radius=0;
 	
 	while(1){
 	    
@@ -82,6 +85,9 @@ int main(void){
 				eraseNChar(16);
 				posCursor(2,1);
 				printLCD("RADIUS:");
+				printNumLCD(2,11,radius);
+				posCursor(2,13);
+				printLCD("mm");
 			}else if(state==2){
 				posCursor(2,1);
 				eraseNChar(16);
@@ -112,10 +118,18 @@ int main(void){
 	   //vrijednosti parametara
 	   
 			if(state==1){
-				posCursor(2,8);
-				eraseNChar(8);
-				posCursor(2,9);
-				printLCD("0");
+				if(reMode==ADJUST){
+					int tmp = radius + 10* getRotEnc();
+					if(tmp<=0) tmp=0;
+				    if(tmp>=999) tmp=999;
+					if(tmp!=radius){
+						radius=tmp;
+						posCursor(2,9);
+						eraseNChar(3);
+						getNumLenght(radius);
+						printNumLCD(2,11,radius);
+		            }
+				}
 			}else if(state==2){
 				posCursor(2,7);
 				eraseNChar(5);
@@ -133,6 +147,7 @@ int main(void){
 				printLCD("%d", temperature);
 			}
 	
+	 
 	   
 	   serviceIRQD();
 	   
@@ -166,7 +181,7 @@ void EXTI1_IRQHandler(void)
 
 void serviceIRQD(void)
 {
-	switch(g_gpiod_irq_state)
+	switch(g_gpioc_irq_state)
 	{
 		case(IRQ_IDLE):
 		{
@@ -174,14 +189,14 @@ void serviceIRQD(void)
 		}
 		case(IRQ_DETECTED):
 		{	
-			g_gpiod_irq_state = (IRQ_WAIT4LOW); 
+			g_gpioc_irq_state = (IRQ_WAIT4LOW); 
 			break;
 		}
 		case(IRQ_WAIT4LOW):
 		{
 			if((GPIOD->IDR & 0x0002) == 0x0002)
 			{
-				g_gpiod_irq_state = (IRQ_DEBOUNCE);
+				g_gpioc_irq_state = (IRQ_DEBOUNCE);
 				g_irq_timer = getSYSTIMER(); 
 			}
 			break;
@@ -190,7 +205,7 @@ void serviceIRQD(void)
 		{
 			if(chk4TimeoutSYSTIMER(g_irq_timer, 50000) == (SYSTIMER_TIMEOUT))
 			{
-				g_gpiod_irq_state = (IRQ_IDLE); 
+				g_gpioc_irq_state = (IRQ_IDLE); 
 			}
 		}
 		default:
@@ -198,4 +213,16 @@ void serviceIRQD(void)
 			break;
 		}
 	}
+}
+
+uint8_t getNumLenght(int x){
+	if(x>=0 && x<=9) return 1;
+	if(x>=10 && x<=99) return 2;
+	if(x>=100 && x<=999) return 3;
+	if(x>=1000 && x<=9999) return 4;
+	if(x>=10000 && x<=99999) return 5;
+}
+void printNumLCD(int line,int pos,int x){
+	posCursor(line,(pos+1-getNumLenght(x)));
+	printLCD("%d",x);
 }
