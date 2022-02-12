@@ -1,8 +1,11 @@
 #include "stm32f4xx.h"
-#include "lcd16x2.h"
+#include "lcd-sim.h"
+//#include "lcd16x2.h"
 #include "usart.h"
 #include "delay.h"
 #include "rot-enc.h"
+#include "i2c.h"
+#include "speed.h"
 
 #define SCROLL 0
 #define ADJUST 1
@@ -27,7 +30,9 @@ int main(void){
 	
 	//######## LCD simulation #####################
 		
+	initI2C2();
 	initLCD();
+	
 			
 	//#############################################
 	
@@ -52,6 +57,11 @@ int main(void){
 	NVIC_EnableIRQ(EXTI1_IRQn);
 	
 	
+	//######### SPEED SENSOR INIT #################
+	initSPEED();
+	//#############################################
+	
+	
 	uint32_t led_timer;
 	initSYSTIMER();
 	
@@ -60,7 +70,7 @@ int main(void){
 	
 	uint8_t state=0;
 	uint8_t chg=0;
-	uint8_t speed=17;
+	//uint8_t speed=17;
 	uint32_t distance=12000;
 	int temperature=30;
 	uint16_t radius=0;
@@ -134,6 +144,12 @@ int main(void){
 				posCursor(2,7);
 				eraseNChar(5);
 				posCursor(2,8);
+				if(chk4TimeoutSYSTIMER(speedTimeOut,3000)==SYSTIMER_TIMEOUT) {
+					speed=0;
+					TIM4->CNT = 0;
+					speedTimeOut=getSYSTIMER();
+				}
+				
 				printLCD("%d",speed);
 			}else if(state==3){
 				posCursor(2,7);
