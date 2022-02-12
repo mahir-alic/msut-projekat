@@ -4,17 +4,23 @@
 #include "stm32f4xx.h"
 #include "usart.h"
 #include "misc.h"
+#include "i2c.h"
 #include <stdarg.h>
 
+#define addr 0x4E
 
 
-//privremeni simulator lcd16x2 displeja
+
+
 
 extern uint8_t r,c;
 
 void initLCD();
 
+void clearLCD(void);
 void printLCD(char * str, ... );
+void sprintLCD(uint8_t * str);
+void putcharLCD(uint8_t data);
 void posCursor(uint8_t, uint8_t);
 void eraseNChar(uint8_t);
 void printLCDFloat(float);

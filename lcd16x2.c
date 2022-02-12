@@ -1,49 +1,132 @@
 #include "lcd16x2.h"
 
 
-uint8_t r=1,c=1;
+
+uint8_t ddram_addr=0x00;
 
 void initLCD(){
-	initUSART2(USART2_BAUDRATE_921600);
 	
-	//clearScreen();
-	putcharUSART2(0x1B);
-	putcharUSART2('c');
-	printUSART2("\e[?25l");//hide cursor
-	printUSART2("\e[34m");//set color     //31 red, 32 green, 33 yellow, 34 blue
+	delay_ms(100);
+		
+	txI2C2(0x4E,0x3C);
+	txI2C2(0x4E,0x38); //interface is 8-bit long
+	delay_ms(10);
+		
+	txI2C2(0x4E,0x3C);
+	txI2C2(0x4E,0x38);
+	delay_ms(10);
+		
+	txI2C2(0x4E,0x3C);
+	txI2C2(0x4E,0x38);
+		
 	
-	printUSART2("|----------------|\n");
-	printUSART2("|                |\n");
-	printUSART2("|                |\n");
-	printUSART2("|----------------|\n");
-	
-	
+	txI2C2(0x4E,0x2C);
+	txI2C2(0x4E,0x28); //set inteface 4-bit long
+		
+	txI2C2(0x4E,0x2C);
+	txI2C2(0x4E,0x28); 
+	txI2C2(0x4E,0xCC);
+	txI2C2(0x4E,0xC8);
+	delay_ms(5); //  2 line interface and font
+		
+	txI2C2(0x4E,0x0C); 
+	txI2C2(0x4E,0x08);
+	txI2C2(0x4E,0x8C);
+	txI2C2(0x4E,0x88); 
+	delay_ms(5); //display off
+		
+	txI2C2(0x4E,0x0C); 
+	txI2C2(0x4E,0x08);
+	txI2C2(0x4E,0x1C);
+	txI2C2(0x4E,0x18); 
+	delay_ms(5); //clear display
+		
+	txI2C2(0x4E,0x0C);
+	txI2C2(0x4E,0x08);
+	txI2C2(0x4E,0xCC);
+	txI2C2(0x4E,0xC8); //set cursor off blink off
+	delay_ms(1000);
+		
 }
 
-//void printLCD(char * str, ... ){
-	//uint8_t n= 16-c+1;
+void sprintLCD(uint8_t * str)
+{
+	uint16_t k = 0;
+		
+	I2C2->CR1 |= I2C_CR1_START; //generate START condition
+	//master waits for a read of the SR1 register
+	//followed by a write in the DR register with the Slave address
+		
+	while((I2C2->SR1 & I2C_SR1_SB) != I2C_SR1_SB);
+	I2C2 ->DR = addr; //write address	
+		
+	while((I2C2->SR1 & I2C_SR1_ADDR)!= I2C_SR1_ADDR);
+	uint32_t x= I2C2->SR2;
 	
-	//char tmp[n+1];
-	//tmp[n]='\0';
-	//for(uint8_t i=0; i<n; i++){
-		//tmp[i]= *str;
-		//str++;
-	//}
-	//printUSART2(tmp);
-	////printUSART2(str);
+	while (str[k] != '\0')
+    {
+        I2C2->DR = (str[k] & 0xF0)|0x0D;
+         while((I2C2->SR1 & I2C_SR1_TXE)!= I2C_SR1_TXE);
+		I2C2->DR = (str[k] & 0xF0)|0x09;
+		 while((I2C2->SR1 & I2C_SR1_TXE)!= I2C_SR1_TXE);
+		I2C2->DR = (str[k] & 0x0F)<<4|0x0D;
+		 while((I2C2->SR1 & I2C_SR1_TXE)!= I2C_SR1_TXE);
+		I2C2->DR = (str[k] & 0x0F)<<4|0x09;
+		 while((I2C2->SR1 & I2C_SR1_TXE)!= I2C_SR1_TXE);
+        if (str[k] == '\n')
+        {
+            //new line
+		}
+        k++;
+
+        if (k == MAX_PRINT_STRING_SIZE)
+            break;
+    }
+    
+    while((I2C2->SR1 & I2C_SR1_TXE)!= I2C_SR1_TXE);
+    
+    I2C2->CR1 |= I2C_CR1_STOP;
+}
 
 
-//}
 
 void posCursor(uint8_t row, uint8_t column){
-	r=row;
-	c=column;
-	printUSART2("\033[%d;%dH",row+1,column+1);	
+	
+	
+	if(row==1) ddram_addr=0x00+column-1;
+	else if(row==2) ddram_addr=0x40+column-1;
+	
+	I2C2->CR1 |= I2C_CR1_START; //generate START condition
+	//master waits for a read of the SR1 register
+	//followed by a write in the DR register with the Slave address
+		
+	while((I2C2->SR1 & I2C_SR1_SB) != I2C_SR1_SB);
+	I2C2 ->DR = addr; //write address
+		
+		
+	while((I2C2->SR1 & I2C_SR1_ADDR)!= I2C_SR1_ADDR); //addres written
+	uint32_t x= I2C2->SR2;
+	
+	//write instruction -----------------------------------------------
+	I2C2->DR = 0x0C | 0x80 | (0x70&ddram_addr);
+	while((I2C2->SR1 & I2C_SR1_TXE)!= I2C_SR1_TXE);
+	I2C2->DR = 0x08 | 0x80 | (0x70&ddram_addr);
+	while((I2C2->SR1 & I2C_SR1_TXE)!= I2C_SR1_TXE);
+	I2C2->DR = 0x0C| ((0x0f&ddram_addr)<<4);
+	while((I2C2->SR1 & I2C_SR1_TXE)!= I2C_SR1_TXE);
+	I2C2->DR = 0x08 | ((0x0F&ddram_addr)<<4);
+	while((I2C2->SR1 & I2C_SR1_TXE)!= I2C_SR1_TXE);
+	
+	//generate STOP condition -----------------------------------------
+	
+	I2C2->CR1 |= I2C_CR1_STOP;
+	
+	
 }
 
 void eraseNChar(uint8_t N){
 	for(uint8_t i=0; i<N; i++){
-		putcharUSART2(' ');
+		putcharLCD(' ');
 	}
 }
 
@@ -60,6 +143,7 @@ void printLCD(char *str, ... )
 	
 	//va_start(vl, 10);													// always pass the last named parameter to va_start, for compatibility with older compilers
 	va_start(vl, str);													// always pass the last named parameter to va_start, for compatibility with older compilers
+	
 	while(str[k] != 0x00)
 	{
 		if(str[k] == '%')
@@ -127,14 +211,15 @@ void printLCD(char *str, ... )
 					case('c'):
 					{// character
 						char tchar = va_arg(vl, int);	
-						putcharUSART2(tchar);
+						//
 						arg_type = (PRINT_ARG_TYPE_CHARACTER);
 						break;
 					}
 					case('s'):
 					{// string 
 						p_char = va_arg(vl, char *);	
-						sprintUSART2((uint8_t *)p_char);
+						//
+						sprintLCD((uint8_t *)p_char);
 						arg_type = (PRINT_ARG_TYPE_STRING);
 						break;
 					}
@@ -200,16 +285,17 @@ void printLCD(char *str, ... )
 				if(arg_type&(PRINT_ARG_TYPE_MASK_CHAR_STRING))	
 				{
 					getStr4NumMISC(arg_type, p_uint32, rstr);
-					sprintUSART2(rstr);	
+						
+					sprintLCD(rstr);
 				}
 				k++;
 			}
 		}
 		else
 		{// not a '%' char -> print the char
-			putcharUSART2(str[k]);
+			putcharLCD(str[k]);
 			if (str[k] == '\n')
-				putcharUSART2('\r');
+				putcharLCD(str[k]);
 		}
 		k++;
 	}
@@ -218,15 +304,43 @@ void printLCD(char *str, ... )
 	return;
 }
 
+void putcharLCD(uint8_t data){
+	I2C2->CR1 |= I2C_CR1_START; //generate START condition
+	//master waits for a read of the SR1 register
+	//followed by a write in the DR register with the Slave address
+		
+	while((I2C2->SR1 & I2C_SR1_SB) != I2C_SR1_SB);
+	I2C2 ->DR = addr; //write address
+		
+	while((I2C2->SR1 & I2C_SR1_ADDR)!= I2C_SR1_ADDR); //address written
+	uint32_t x= I2C2->SR2;
+	
+	I2C2->DR = (data & 0xF0)|0x0D;
+	while((I2C2->SR1 & I2C_SR1_TXE)!= I2C_SR1_TXE);
+	I2C2->DR = (data & 0xF0)|0x09;
+	while((I2C2->SR1 & I2C_SR1_TXE)!= I2C_SR1_TXE);
+	I2C2->DR = (data & 0x0F)<<4|0x0D;
+	while((I2C2->SR1 & I2C_SR1_TXE)!= I2C_SR1_TXE);
+	I2C2->DR = (data & 0x0F)<<4|0x09;
+	while((I2C2->SR1 & I2C_SR1_TXE)!= I2C_SR1_TXE);
+    
+	I2C2->CR1 |= I2C_CR1_STOP; //generate STOP condition
+}
+
 printLCDFloat(float x){
 	int dec=x;
-	
-	
 	int frac=abs(round((x-dec)*100));
-	
-		
 	if(x>-1.0 && x<0.0) printLCD("-%d.%d",dec,frac);
 	else printLCD("%d.%d",dec,frac);
+}
+
+void clearLCD(void){
+	txI2C2(0x4E,0x0C); 
+	txI2C2(0x4E,0x08);
+	txI2C2(0x4E,0x1C);
+	txI2C2(0x4E,0x18); 
+	//delay_ms(10);
+		 //clear display
 }
 
 
