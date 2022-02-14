@@ -1,11 +1,12 @@
 #include "stm32f4xx.h"
-#include "lcd-sim.h"
-//#include "lcd16x2.h"
+//#include "lcd-sim.h"
+#include "lcd16x2.h"
 #include "usart.h"
 #include "delay.h"
 #include "rot-enc.h"
 #include "i2c.h"
 #include "speed.h"
+#include "adc.h"
 
 #define SCROLL 0
 #define ADJUST 1
@@ -17,6 +18,12 @@
 #define IRQ_WAIT4LOW		2
 #define IRQ_DEBOUNCE		3
 #define IRQ_CNT
+
+#define LIGHT_REF 2048
+#define OFF 0
+#define BLINK_F 1  // fast blink
+#define BLINK_S 2  // slow blink
+#define ON 3
 
 volatile uint32_t g_irq_cnt = 0;
 volatile uint8_t g_gpioc_irq_state = (IRQ_IDLE);
@@ -64,19 +71,35 @@ int main(void){
 	
 	uint32_t led_timer;
 	initSYSTIMER();
-	
+
     
     //#############################################
+    
+    //########## HEADLIGHT CONFIG #################
+    initADC1(); //light senzor
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;                                /** GPIOC Periph clock enable */
+    GPIOC->MODER &= ~GPIO_MODER_MODER4; 								
+	GPIOC->MODER |= GPIO_MODER_MODER4_0;  								/** Set output mode on pin 4 */
+	GPIOC->OTYPER |= GPIO_OTYPER_OT_4;                                   //Open drain
+	GPIOC->ODR |= 0x0010;
+	//GPIOD->OSPEEDR &= ~GPIO_OSPEEDR_OSPEEDR; 								/** No pullup or pulldown */
+    
+   //#############################################
 	
 	uint8_t state=0;
 	uint8_t chg=0;
 	//uint8_t speed=17;
-	uint32_t distance=12000;
-	int temperature=30;
-	uint16_t radius=0;
+	//uint32_t distance=12000;
+	int temperature=0;
+	//uint16_t radius=0;
+	uint32_t light=0;
+	uint8_t adc_cnt=0;
+	uint8_t light_state=OFF;
+	clearLCD();
 	
 	while(1){
 	    
+			
 			if(reMode==SCROLL){int tmp=state;
 			state+=getRotEnc();
 			if(state>=5) state=4;
@@ -110,6 +133,8 @@ int main(void){
 				eraseNChar(16);
 				posCursor(2,1);
 				printLCD("DIST:");
+				posCursor(2,7);
+				eraseNChar(7);
 			    posCursor(2,13);
 				printLCD("m");
 			}else if(state==4){
@@ -138,24 +163,22 @@ int main(void){
 						eraseNChar(3);
 						getNumLenght(radius);
 						printNumLCD(2,11,radius);
+						setNCirc(radius);
 		            }
 				}
 			}else if(state==2){
 				posCursor(2,7);
-				eraseNChar(5);
-				posCursor(2,8);
+				eraseNChar(4);
 				if(chk4TimeoutSYSTIMER(speedTimeOut,3000)==SYSTIMER_TIMEOUT) {
 					speed=0;
 					TIM4->CNT = 0;
 					speedTimeOut=getSYSTIMER();
 				}
-				
-				printLCD("%d",speed);
+				printNumLCD(2,10,speed);
 			}else if(state==3){
 				posCursor(2,7);
 				eraseNChar(5);
-				posCursor(2,7);
-				printLCD("%d", distance);
+				printNumLCD(2,11,(int)distance);
 			}else if(state==4){
 				posCursor(2,7);
 				eraseNChar(3);
@@ -165,21 +188,70 @@ int main(void){
 	
 	 
 	   
-	   serviceIRQD();
-	   
-	   
-	   
+		serviceIRQD();
 		
-		//int tmp = radius + 1* getRotEnc();
-		//if(tmp!=radius){
-		//	radius=tmp;
-		//	posCursor(2,9);
-		//	eraseNChar(7);
-		//	posCursor(2,9);
-		//	printLCD("%d mm",radius);
-		//}
+		//################ LIGHT ###################
 		
-		
+		light+=getADC1();
+		delay_ms(100);
+		//delay_ms(1000);
+		adc_cnt++;
+		if(adc_cnt>=10){
+			adc_cnt=0;
+			light=light/10;
+			
+			if((light_state==OFF) && (light>=2048) && (light<3072)){
+				light_state=BLINK_S;
+				for(uint8_t i=0;i<2;++i){
+					GPIOC->ODR &= ~0x0010;
+					delay_ms(100);
+					GPIOC->ODR |= 0x0010;
+					delay_ms(100);
+				}
+				
+			}if((light_state==BLINK_S) && (light>=3072) && (light<4096)){
+				light_state=ON;
+				GPIOC->ODR &= ~0x0010;
+				delay_ms(100);
+				GPIOC->ODR |= 0x0010;
+				delay_ms(100);
+			}if((light_state==ON) && (light>=2048) && (light<3072)){
+				light_state=BLINK_S;
+				for(uint8_t i=0;i<3;++i){
+					GPIOC->ODR &= ~0x0010;
+					delay_ms(100);
+					GPIOC->ODR |= 0x0010;
+					delay_ms(100);
+				}
+			}if((light_state==BLINK_S) && (light<=2048)){
+				light_state=OFF;
+				for(uint8_t i=0;i<2;++i){
+					GPIOC->ODR &= ~0x0010;
+					delay_ms(100);
+					GPIOC->ODR |= 0x0010;
+					delay_ms(100);
+				}
+			}if((light_state==OFF) && (light>=3072) && (light<4096)){
+				light_state=ON;
+				for(uint8_t i=0;i<3;++i){
+					GPIOC->ODR &= ~0x0010;
+					delay_ms(100);
+					GPIOC->ODR |= 0x0010;
+					delay_ms(100);
+				}
+			}if((light_state==ON) && (light<2048)){
+				light_state=OFF;
+				GPIOC->ODR &= ~0x0010;
+				delay_ms(100);
+				GPIOC->ODR |= 0x0010;
+				delay_ms(100);
+			}
+			
+			//---------------------------------------
+			light=0;
+		//###################################################
+		}
+	  
 		
 	}
 }
