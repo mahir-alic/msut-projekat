@@ -68,4 +68,3 @@ uint16_t getADC1Temp(void)
 	temp = (temp - (ADC1_TEMP_V25))/(ADC1_AVR_SLOPE) + 25;
 			
 	return temp;
-}
