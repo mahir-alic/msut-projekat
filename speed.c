@@ -3,8 +3,9 @@
 uint32_t speedTime=0;
 uint32_t speedTimeOut;
 int speed=0;
-extern uint16_t radius=0;
-float n_circ=6031.0;
+uint16_t radius=0;
+float n_circ=0.0;
+float distance=0.0;
 void initSPEED(void){
 
 		initSYSTIMER();
@@ -51,13 +52,12 @@ void setNCirc(uint16_t r){
 
 void TIM4_IRQHandler(){
 	if((TIM4->SR & TIM_SR_UIF)== TIM_SR_UIF){
-		//float time=(getSYSTIMER()-speedTime)/N_CYCLES;
-		float time=(getSYSTIMER()-speedTime);
-		//speed=2.1*3*(1000/time)*3.6; //3 obima ? 
+		float time=(getSYSTIMER()-speedTime); 
 		speed= (int)(n_circ*3.6/time); // km/h
 		
 		speedTime=getSYSTIMER();
 		speedTimeOut=getSYSTIMER();
+		distance+=n_circ/1000;
 	}
 	
 	TIM4->SR &= ~TIM_SR_UIF;
