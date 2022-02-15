@@ -472,4 +472,5 @@ void printNumLCD(int line,int pos,int x){
 		posCursor(line,(pos-getNumLenght(x)));	
 	}
 	printLCD("%d",x);
+}
 	

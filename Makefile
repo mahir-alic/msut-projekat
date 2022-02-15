@@ -11,9 +11,9 @@ SRCS += delay.c
 SRCS += usart.c
 SRCS += misc.c
 SRCS += adc.c
-#SRCS += lcd16x2.c
+SRCS += lcd16x2.c
 SRCS += rot-enc.c
-SRCS += lcd-sim.c
+#SRCS += lcd-sim.c
 SRCS += i2c.c
 SRCS += speed.c
 

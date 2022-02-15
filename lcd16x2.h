@@ -1,4 +1,4 @@
-#ifndef _LCD16x2_H
+6#ifndef _LCD16x2_H
 #define _LCD16x2_H
 
 #include "stm32f4xx.h"

@@ -11,6 +11,7 @@ uint32_t speedTimeOut;
 extern int speed;
 extern uint16_t radius;
 void setNCirc(uint16_t);
+extern float distance;
 
 float n_circ;
 

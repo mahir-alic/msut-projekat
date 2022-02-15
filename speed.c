@@ -6,6 +6,7 @@ int speed=0;
 uint16_t radius=0;
 float n_circ=0.0;
 float distance=0.0;
+
 void initSPEED(void){
 
 		initSYSTIMER();
