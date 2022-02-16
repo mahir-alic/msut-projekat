@@ -444,7 +444,7 @@ void serviceIRQD(void)
 		}
 		case(IRQ_DEBOUNCE):
 		{
-			if(chk4TimeoutSYSTIMER(g_irq_timer, 50000) == (SYSTIMER_TIMEOUT))
+			if(chk4TimeoutSYSTIMER(g_irq_timer, 300000) == (SYSTIMER_TIMEOUT)) // 300 ms 
 			{
 				g_gpioc_irq_state = (IRQ_IDLE); 
 			}
@@ -474,3 +474,4 @@ void printNumLCD(int line,int pos,int x){
 	printLCD("%d",x);
 }
 	
+
