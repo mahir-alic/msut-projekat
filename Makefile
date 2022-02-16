@@ -17,6 +17,7 @@ SRCS += rot-enc.c
 SRCS += i2c.c
 SRCS += speed.c
 SRCS += dht11.c
+SRCS += blinker.c
 
 # Normally you shouldn't need to change anything below this line!
 #######################################################################################
