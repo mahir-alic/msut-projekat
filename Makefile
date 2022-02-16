@@ -16,6 +16,7 @@ SRCS += rot-enc.c
 #SRCS += lcd-sim.c
 SRCS += i2c.c
 SRCS += speed.c
+SRCS += dht11.c
 
 # Normally you shouldn't need to change anything below this line!
 #######################################################################################
