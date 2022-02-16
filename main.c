@@ -8,6 +8,7 @@
 #include "speed.h"
 #include "adc.h"
 #include "dht11.h"
+#include "blinker.h"
 
 #define SCROLL 0
 #define ADJUST 1
@@ -27,7 +28,7 @@
 #define ON 3
 
 volatile uint32_t g_irq_cnt = 0;
-volatile uint8_t g_gpioc_irq_state = (IRQ_IDLE);
+volatile uint8_t g_gpiod_irq_state = (IRQ_IDLE);
 volatile uint32_t g_irq_timer = 0;
 uint8_t reMode=SCROLL;
 uint8_t getNumLenght(int);
@@ -50,20 +51,50 @@ int main(void){
 	
 	//#############################################
 	
-    //######### PBTN CONFIG  ######################
+	//######### PBTN CONFIG - ROT-ENC ######################            //PD1
     
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
     GPIOD->PUPDR |= GPIO_PUPDR_PUPDR1_0;
     
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;								// enable clock on SYSCFG register
-	SYSCFG->EXTICR[0] = SYSCFG_EXTICR1_EXTI1_PD;						// select PC 8 as interrupt source p259
-	EXTI->IMR = EXTI_IMR_MR1;											// enable interrupt on EXTI_Line8
-	EXTI->EMR &= ~EXTI_EMR_MR1;											// disable event on EXTI_Line8
-	EXTI->FTSR = EXTI_FTSR_TR1;	
-	EXTI->RTSR = 0x00000000;	
+	SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI1_PD;						// select PD 1 as interrupt source p259
+	EXTI->IMR |= EXTI_IMR_MR1;											// enable interrupt on EXTI_Line1
+	EXTI->EMR &= ~EXTI_EMR_MR1;											// disable event on EXTI_Line1
+	EXTI->FTSR |= EXTI_FTSR_TR1;	
+	EXTI->RTSR &= ~EXTI_RTSR_TR1;	
 	
 	NVIC_EnableIRQ(EXTI1_IRQn);
 	
+	//######################################################
+	
+	initBlink();
+	//########### PBTN CONFIG - LEFT BLINK ################             //PD2
+	
+    GPIOD->PUPDR |= GPIO_PUPDR_PUPDR2_1;                                 //Pull-down
+    
+    //RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;								// enable clock on SYSCFG register
+	SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI2_PD;						// select PD 2 as interrupt source p259
+	EXTI->IMR |= EXTI_IMR_MR2;											// enable interrupt on EXTI_Line2
+	EXTI->EMR &= ~EXTI_EMR_MR2;											// disable event on EXTI_Line2
+	EXTI->RTSR |= EXTI_RTSR_TR2;	
+	EXTI->FTSR &= ~EXTI_FTSR_TR2;	
+	
+	NVIC_EnableIRQ(EXTI2_IRQn);
+	//######################################################
+	
+	//########### PBTN CONFIG - RIGHT BLINK ################             //PD0
+	
+    GPIOD->PUPDR |= GPIO_PUPDR_PUPDR0_1;                                 //Pull-down
+    
+    //RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;								// enable clock on SYSCFG register
+	SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI0_PD;						// select PD 0 as interrupt source p259
+	EXTI->IMR |= EXTI_IMR_MR0;											// enable interrupt on EXTI_Line0
+	EXTI->EMR &= ~EXTI_EMR_MR0;											// disable event on EXTI_Line0
+	EXTI->RTSR |= EXTI_RTSR_TR0;	
+	EXTI->FTSR &= ~EXTI_FTSR_TR0;	
+	
+	NVIC_EnableIRQ(EXTI0_IRQn);
+	//######################################################
 	
 	//######### SPEED SENSOR INIT #################
 	initSPEED();
@@ -436,9 +467,27 @@ void EXTI1_IRQHandler(void)
 	}
 }
 
+void EXTI0_IRQHandler(void)
+{// with sudo 
+	if((EXTI->PR & EXTI_PR_PR0) == EXTI_PR_PR0)							// EXTI_Line0 interrupt pending?
+	{
+		right();
+		EXTI->PR = EXTI_PR_PR0;											// clear EXTI_Line0 interrupt flag
+	}
+}
+
+void EXTI2_IRQHandler(void)
+{// with sudo 
+	if((EXTI->PR & EXTI_PR_PR2) == EXTI_PR_PR2)							// EXTI_Line2 interrupt pending?
+	{
+		left();
+		EXTI->PR = EXTI_PR_PR2;											// clear EXTI_Line2 interrupt flag
+	}
+}
+
 void serviceIRQD(void)
 {
-	switch(g_gpioc_irq_state)
+	switch(g_gpiod_irq_state)
 	{
 		case(IRQ_IDLE):
 		{
@@ -446,14 +495,14 @@ void serviceIRQD(void)
 		}
 		case(IRQ_DETECTED):
 		{	
-			g_gpioc_irq_state = (IRQ_WAIT4LOW); 
+			g_gpiod_irq_state = (IRQ_WAIT4LOW); 
 			break;
 		}
 		case(IRQ_WAIT4LOW):
 		{
 			if((GPIOD->IDR & 0x0002) == 0x0002)
 			{
-				g_gpioc_irq_state = (IRQ_DEBOUNCE);
+				g_gpiod_irq_state = (IRQ_DEBOUNCE);
 				g_irq_timer = getSYSTIMER(); 
 			}
 			break;
@@ -462,7 +511,7 @@ void serviceIRQD(void)
 		{
 			if(chk4TimeoutSYSTIMER(g_irq_timer, 300000) == (SYSTIMER_TIMEOUT)) // 150 ms 
 			{
-				g_gpioc_irq_state = (IRQ_IDLE); 
+				g_gpiod_irq_state = (IRQ_IDLE); 
 			}
 		}
 		default:
