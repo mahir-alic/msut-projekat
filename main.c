@@ -7,6 +7,7 @@
 #include "i2c.h"
 #include "speed.h"
 #include "adc.h"
+#include "dht11.h"
 
 #define SCROLL 0
 #define ADJUST 1
@@ -85,12 +86,21 @@ int main(void){
 	//GPIOD->OSPEEDR &= ~GPIO_OSPEEDR_OSPEEDR; 								/** No pullup or pulldown */
     
    //#############################################
+   
+   //######### dht11 Temperature sensor init #####
+   
+   dht11Config();
+   
+   struct dht11Data temp=dht11Read();
+   
+   //#############################################
 	
 	uint8_t state=0;
 	uint8_t chg=0;
 	//uint8_t speed=17;
 	//uint32_t distance=12000;
 	int temperature=0;
+	uint32_t temp_time=getSYSTIMER();
 	//uint16_t radius=0;
 	uint32_t light=0;
 	uint8_t adc_cnt=0;
@@ -343,6 +353,12 @@ int main(void){
 				}
 			}
 	
+	
+		if(chk4TimeoutSYSTIMER(temp_time,1000)==SYSTIMER_TIMEOUT){
+			temp=dht11Read();
+			temperature=temp.T_integral;
+			temp_time=getSYSTIMER();
+		}
 	 
 	   
 		serviceIRQD();
@@ -444,7 +460,7 @@ void serviceIRQD(void)
 		}
 		case(IRQ_DEBOUNCE):
 		{
-			if(chk4TimeoutSYSTIMER(g_irq_timer, 300000) == (SYSTIMER_TIMEOUT)) // 300 ms 
+			if(chk4TimeoutSYSTIMER(g_irq_timer, 300000) == (SYSTIMER_TIMEOUT)) // 150 ms 
 			{
 				g_gpioc_irq_state = (IRQ_IDLE); 
 			}
