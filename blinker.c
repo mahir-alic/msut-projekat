@@ -2,7 +2,8 @@
 
 #define OFF 0
 #define BLINK_DUTY 800
-#define HEAD_LIGHT_DUTY 400
+#define HEAD_LIGHT_BLINK 400
+#define HEAD_LIGHT_ON 1601
 
 //void right(void);
 //void left(void);
@@ -27,7 +28,7 @@ void initBlink(void)
 		
 		TIM4->CCR1 = 0x0000;											// duty cycle for the PWM set to 50%
 		TIM4->CCR2 = 0x0000;
-	//	TIM4->CCR3 = 0x0000;
+		TIM4->CCR3 = 0x0000;
 	//	TIM4->CCR4 = 0x0000;
 		
 		TIM4->CCMR1 |= (TIM_CCMR1_OC1PE)|(TIM_CCMR1_OC1M_2)|(TIM_CCMR1_OC1M_1);
@@ -48,14 +49,32 @@ void initBlink(void)
 		TIM4->CR1 |= TIM_CR1_CEN;											
 	}
 
-void right(void) {
+void right_blinker(void) {
 	TIM4->CCR1 = OFF;
 	TIM4->CCR2 = BLINK_DUTY;
 }
-void left(void) {
+void left_blinker(void) {
 	TIM4->CCR2 = OFF;
 	TIM4->CCR1 = BLINK_DUTY;
 }
-void light(void) {
-	TIM4->CCR3 = HEAD_LIGHT_DUTY;	
+void light_on(void) {
+	TIM4->CCR3 = HEAD_LIGHT_ON;	
+}
+void light_off(void){
+	TIM4->CCR3 = OFF;	
+}
+void light_blink(void) {
+	TIM4->CCR3 = HEAD_LIGHT_BLINK;
+}
+int right_status(void){
+	if((TIM4->CCR2!=0x0000)&&(TIM4->CNT < TIM4->CCR2))  
+	return 1;
+	else
+	return 0;
+}
+int left_status(void){
+	if((TIM4->CCR1!=0x0000)&&(TIM4->CNT < TIM4->CCR1))  
+	return 1;
+	else
+	return 0;
 }
