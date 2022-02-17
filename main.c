@@ -23,9 +23,19 @@
 
 
 #define OFF 0
-#define BLINK_F 1  // fast blink
-#define BLINK_S 2  // slow blink
-#define ON 3
+//#define BLINK_F 1  // fast blink
+#define BLINK 1  // slow blink
+#define ON 2
+
+
+#define LIGHT_MODE_OFF 0
+#define LIGHT_MODE_ON 1
+#define LIGHT_MODE_AUTO 2
+
+#define LIGHT_HYST 100   //light sensor hysteresis
+uint16_t light_ref_on=3000;  // ref value on 
+uint16_t light_ref_blink=2000; //ref value blink
+
 
 volatile uint32_t g_irq_cnt = 0;
 volatile uint8_t g_gpiod_irq_state = (IRQ_IDLE);
@@ -34,6 +44,8 @@ uint8_t reMode=SCROLL;
 uint8_t getNumLenght(int);
 void printNumLCD(int line,int pos,int x);
 
+uint8_t status_r=0;
+uint8_t status_l=0;
 
 int main(void){
 	
@@ -136,6 +148,7 @@ int main(void){
 	uint32_t light=0;
 	uint8_t adc_cnt=0;
 	uint8_t light_state=0;
+	uint8_t light_mode=OFF;
 	int max_speed=0;
 	clearLCD();
 	delay_ms(100);
@@ -150,7 +163,7 @@ int main(void){
 			
 			if(reMode==SCROLL){int tmp=state;
 			state+=getRotEnc();
-			if(state>=7) state=6;
+			if(state>=10) state=9;
 			else if(state<=0) state=1;
 			if(state!=tmp){
 				chg=CHANGED;
@@ -252,8 +265,54 @@ int main(void){
 				printLCD("SPEED:");
 				posCursor(2,12);
 				printLCD("kph");
-			}
-			else if(state==6){
+			}else if(state==6){ //ovdje dodat
+				posCursor(1,1);
+				eraseNChar(16);
+				posCursor(2,1);
+				eraseNChar(16);
+				posCursor(1,4);
+				printLCD("LIGHT MODE");
+				if(light_mode==LIGHT_MODE_OFF){
+							//posCursor(2,1);
+							//eraseNChar(16);
+							posCursor(2,7);
+							printLCD("OFF");
+						}
+						if(light_mode==LIGHT_MODE_ON){
+							//posCursor(2,1);
+							//eraseNChar(16);
+							posCursor(2,8);
+							printLCD("ON");
+						}
+						if(light_mode==LIGHT_MODE_AUTO){
+							//posCursor(2,1);
+							//eraseNChar(16);
+							posCursor(2,7);
+							printLCD("AUTO");
+						}
+				
+				
+			}else if(state==7){
+				posCursor(1,1);
+				eraseNChar(16);
+				posCursor(2,1);
+				eraseNChar(16);
+				posCursor(1,1);
+				printLCD("LIGHT SENS.REF.");
+				posCursor(2,1);
+				printLCD("BLINK:");
+				printNumLCD(2,11,light_ref_blink);
+			}else if(state==8){
+				posCursor(1,1);
+				eraseNChar(16);
+				posCursor(2,1);
+				eraseNChar(16);
+				posCursor(1,1);
+				printLCD("LIGHT SENS.REF.");
+				posCursor(2,1);
+				printLCD("ON:");
+				printNumLCD(2,8,light_ref_on);
+			}else if(state==9){
 				posCursor(1,1);
 				eraseNChar(16);
 				posCursor(1,6);
@@ -268,7 +327,7 @@ int main(void){
 		
 	   }
 	   
-	   //vrijednosti parametara
+	   //vrijednosti parametara -------------------------------------------------
 	   
 			if(state==1){
 				if(reMode==ADJUST){
@@ -316,6 +375,40 @@ int main(void){
 				printNumLCD(2,10,speed);
 				if(max_speed<speed) max_speed=speed;
 				printNumLCD(1,12,max_speed);
+				int tmp=right_status();
+				if(tmp!=status_r){
+					status_r=tmp;
+					if(tmp==1){
+						posCursor(1,15);
+						eraseNChar(2);
+						posCursor(1,15);
+						printLCD("->");
+						posCursor(1,15);
+						printLCD("  ");
+						posCursor(1,15);
+						printLCD("->");
+					}else if(tmp==0){
+					posCursor(1,15);
+					printLCD("  ");
+					}
+				}
+				tmp=left_status();
+				if(tmp!=status_l){
+					status_l=tmp;
+					if(left_status()==1){
+						posCursor(1,1);
+						eraseNChar(2);
+						posCursor(1,1);
+						printLCD("<-");
+						posCursor(1,1);
+						printLCD("  ");
+						posCursor(1,1);
+						printLCD("<-");
+					}else if(tmp==0){
+						posCursor(1,1);
+						printLCD("  ");
+					}
+			    }
 				
 			}else if(state==4){
 				posCursor(1,7);
@@ -331,6 +424,40 @@ int main(void){
 				printNumLCD(2,10,speed);
 				if(max_speed<speed) max_speed=speed;
 				
+				int tmp=right_status();
+				if(tmp!=status_r){
+					status_r=tmp;
+					if(tmp==1){
+						posCursor(1,15);
+						eraseNChar(2);
+						posCursor(1,15);
+						printLCD("->");
+						posCursor(1,15);
+						printLCD("  ");
+						posCursor(1,15);
+						printLCD("->");
+					}else if(tmp==0){
+					posCursor(1,15);
+					printLCD("  ");
+					}
+				}
+				tmp=left_status();
+				if(tmp!=status_l){
+					status_l=tmp;
+					if(left_status()==1){
+						posCursor(1,1);
+						eraseNChar(2);
+						posCursor(1,1);
+						printLCD("<-");
+						posCursor(1,1);
+						printLCD("  ");
+						posCursor(1,1);
+						printLCD("<-");
+					}else if(tmp==0){
+						posCursor(1,1);
+						printLCD("  ");
+					}
+			    }
 				
 			}else if(state==5){
 				posCursor(1,9);
@@ -352,12 +479,142 @@ int main(void){
 				}
 				printNumLCD(2,10,speed);
 				if(max_speed<speed) max_speed=speed;
+				
+				int tmp=right_status();
+				if(tmp!=status_r){
+					status_r=tmp;
+					if(tmp==1){
+						posCursor(1,15);
+						eraseNChar(2);
+						posCursor(1,15);
+						printLCD("->");
+						posCursor(1,15);
+						printLCD("  ");
+						posCursor(1,15);
+						printLCD("->");
+					}else if(tmp==0){
+					posCursor(1,15);
+					printLCD("  ");
+					}
+				}
+				tmp=left_status();
+				if(tmp!=status_l){
+					status_l=tmp;
+					if(left_status()==1){
+						posCursor(1,1);
+						eraseNChar(2);
+						posCursor(1,1);
+						printLCD("<-");
+						posCursor(1,1);
+						printLCD("  ");
+						posCursor(1,1);
+						printLCD("<-");
+					}else if(tmp==0){
+						posCursor(1,1);
+						printLCD("  ");
+					}
+			    }
 			}else if(state==6){
+				if(reMode==ADJUST){
+					int tmp =light_mode + getRotEnc();
+					if(tmp<=0) tmp=0;
+				    if(tmp>=2) tmp=2;
+					if(tmp!=light_mode){
+						light_mode=tmp;
+						if(light_mode==LIGHT_MODE_OFF){
+							posCursor(2,1);
+							eraseNChar(16);
+							posCursor(2,7);
+							printLCD("OFF");
+						}
+						if(light_mode==LIGHT_MODE_ON){
+							posCursor(2,1);
+							eraseNChar(16);
+							posCursor(2,8);
+							printLCD("ON");
+						}
+						if(light_mode==LIGHT_MODE_AUTO){
+							posCursor(2,1);
+							eraseNChar(16);
+							posCursor(2,7);
+							printLCD("AUTO");
+						}
+					}
+				}
+				int tmp=right_status();
+				if(tmp!=status_r){
+					status_r=tmp;
+					if(tmp==1){
+						posCursor(1,15);
+						eraseNChar(2);
+						posCursor(1,15);
+						printLCD("->");
+						posCursor(1,15);
+						printLCD("  ");
+						posCursor(1,15);
+						printLCD("->");
+					}else if(tmp==0){
+					posCursor(1,15);
+					printLCD("  ");
+					}
+				}
+				tmp=left_status();
+				if(tmp!=status_l){
+					status_l=tmp;
+					if(left_status()==1){
+						posCursor(1,1);
+						eraseNChar(2);
+						posCursor(1,1);
+						printLCD("<-");
+						posCursor(1,1);
+						printLCD("  ");
+						posCursor(1,1);
+						printLCD("<-");
+					}else if(tmp==0){
+						posCursor(1,1);
+						printLCD("  ");
+					}
+			    }
+			}else if(state==7){
+				if(reMode==ADJUST){
+					int tmp = light_ref_blink + 10* getRotEnc();
+					if(tmp<=0) tmp=0;
+				    if(tmp>=3500) tmp=3500;
+					if(tmp!=light_ref_blink){
+						light_ref_blink=tmp;
+						posCursor(2,7);
+						eraseNChar(5);
+						printNumLCD(2,11,light_ref_blink);
+						if((light_ref_on-light_ref_blink)<500)
+						{
+							light_ref_on=light_ref_blink+500;
+						}
+					}
+			    }
+		    }else if(state==8){
+				if(reMode==ADJUST){
+					int tmp = light_ref_on + 10* getRotEnc();
+					if(tmp<=500) tmp=500;
+				    if(tmp>=4096) tmp=4096;
+					if(tmp!=light_ref_on){
+						light_ref_on=tmp;
+						posCursor(2,4);
+						eraseNChar(5);
+						printNumLCD(2,8,light_ref_on);
+						if((light_ref_on-light_ref_blink)<500)
+						{
+							light_ref_blink=light_ref_on-500;
+						}
+					}
+			    }
+		    }else if(state==9){
 				if(reMode==ADJUST){
 					if(getRotEnc()!=0){
 						speed=0;
 						max_speed=0;
 						distance=0;
+						light_ref_on=3000;  
+						light_ref_blink=2000; 
 						state=3;
 						reMode=SCROLL;
 						
@@ -396,74 +653,58 @@ int main(void){
 		
 		//######################## LIHGT ################################
 		
+	if(light_mode==LIGHT_MODE_AUTO){
 		light+=getADC1();
 		//delay_ms(1000);
 		adc_cnt++;
 		if(adc_cnt>=10){
 			adc_cnt=0;
 			light=light/10;
-			if((light_state==OFF) && (light>=2048) && (light<3072)){
-				light_state=BLINK_S;
-				for(uint8_t i=0;i<2;++i){
-					GPIOC->ODR &= ~0x0010;
-					delay_ms(100);
-					GPIOC->ODR |= 0x0010;
-					delay_ms(100);
-				}
-				
-			}if((light_state==BLINK_S) && (light>=3072) && (light<4096)){
+			if((light_state==OFF) && (light>=light_ref_blink+LIGHT_HYST) && (light<light_ref_on+LIGHT_HYST)){
+				light_state=BLINK;
+				light_blink();
+			}if((light_state==BLINK) && (light>=light_ref_on+LIGHT_HYST) && (light<4096)){
 				light_state=ON;
-				GPIOC->ODR &= ~0x0010;
-				delay_ms(100);
-				GPIOC->ODR |= 0x0010;
-				delay_ms(100);
-			}if((light_state==ON) && (light>=2048) && (light<3072)){
-				light_state=BLINK_S;
-				for(uint8_t i=0;i<3;++i){
-					GPIOC->ODR &= ~0x0010;
-					delay_ms(100);
-					GPIOC->ODR |= 0x0010;
-					delay_ms(100);
-				}
-			}if((light_state==BLINK_S) && (light<=2048)){
+				light_on();
+			}if((light_state==ON) && (light>=light_ref_blink-LIGHT_HYST) && (light<light_ref_on-LIGHT_HYST)){
+				light_state=BLINK;
+				light_blink();
+			}if((light_state==BLINK) && (light<=light_ref_blink-LIGHT_HYST)){
 				light_state=OFF;
-				for(uint8_t i=0;i<2;++i){
-					GPIOC->ODR &= ~0x0010;
-					delay_ms(100);
-					GPIOC->ODR |= 0x0010;
-					delay_ms(100);
-				}
-			}if((light_state==OFF) && (light>=3072) && (light<4096)){
+				light_off();
+			}if((light_state==OFF) && (light>=light_ref_on+LIGHT_HYST) && (light<4096)){
 				light_state=ON;
-				for(uint8_t i=0;i<3;++i){
-					GPIOC->ODR &= ~0x0010;
-					delay_ms(100);
-					GPIOC->ODR |= 0x0010;
-					delay_ms(100);
-				}
-			}if((light_state==ON) && (light<2048)){
+				light_on();
+			}if((light_state==ON) && (light<light_ref_blink-LIGHT_HYST)){
 				light_state=OFF;
-				GPIOC->ODR &= ~0x0010;
-					delay_ms(100);
-					GPIOC->ODR |= 0x0010;
-					delay_ms(100);
+				light_off();
 			}
 			light=0;
 		}
+	}
+	else if((light_mode==LIGHT_MODE_ON)){
+		light_state=ON;
+		light_on();
+	}
+	else if((light_mode==LIGHT_MODE_OFF)){
+		light_state=OFF;
+		light_off();
+	}
 	  
 	  //###############################################################
 		
-	}
-}
+	} //while end
+}// main end
 
 void EXTI1_IRQHandler(void)
 {// with 
-	if((EXTI->PR & EXTI_PR_PR1) == EXTI_PR_PR1)							// EXTI_Line0 interrupt pending?
+	if((EXTI->PR & EXTI_PR_PR1) == EXTI_PR_PR1)							// EXTI_Line1 interrupt pending?
 	{
 		
-		if(reMode==SCROLL) reMode=ADJUST;
+		if
+		(reMode==SCROLL) reMode=ADJUST;
 			else if(reMode==ADJUST) reMode=SCROLL;
-		EXTI->PR = EXTI_PR_PR1;											// clear EXTI_Line0 interrupt flag
+		EXTI->PR = EXTI_PR_PR1;											// clear EXTI_Line1 interrupt flag
 	}
 }
 
@@ -471,7 +712,7 @@ void EXTI0_IRQHandler(void)
 {// with sudo 
 	if((EXTI->PR & EXTI_PR_PR0) == EXTI_PR_PR0)							// EXTI_Line0 interrupt pending?
 	{
-		right();
+		right_blinker();
 		EXTI->PR = EXTI_PR_PR0;											// clear EXTI_Line0 interrupt flag
 	}
 }
@@ -480,7 +721,7 @@ void EXTI2_IRQHandler(void)
 {// with sudo 
 	if((EXTI->PR & EXTI_PR_PR2) == EXTI_PR_PR2)							// EXTI_Line2 interrupt pending?
 	{
-		left();
+		left_blinker();
 		EXTI->PR = EXTI_PR_PR2;											// clear EXTI_Line2 interrupt flag
 	}
 }
