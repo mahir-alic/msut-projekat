@@ -1,9 +1,15 @@
 #include "blinker.h"
+#include "usart.h"
 
 #define OFF 0
 #define BLINK_DUTY 800
 #define HEAD_LIGHT_BLINK 400
 #define HEAD_LIGHT_ON 1601
+
+
+uint8_t l_state=LEFT_NOT_BLINKING;
+uint8_t r_state=RIGHT_NOT_BLINKING;
+
 
 //void right(void);
 //void left(void);
@@ -51,11 +57,27 @@ void initBlink(void)
 
 void right_blinker(void) {
 	TIM4->CCR1 = OFF;
-	TIM4->CCR2 = BLINK_DUTY;
+	if(TIM4->CCR2==BLINK_DUTY){
+		TIM4->CCR2=OFF;
+		r_state=RIGHT_NOT_BLINKING;
+		putcharUSART3('0');
+	}else if(TIM4->CCR2==OFF){
+		TIM4->CCR2 = BLINK_DUTY;
+		r_state=RIGHT_BLINKING;
+		putcharUSART3('R');
+	}
 }
 void left_blinker(void) {
 	TIM4->CCR2 = OFF;
-	TIM4->CCR1 = BLINK_DUTY;
+	if(TIM4->CCR1==BLINK_DUTY){
+		TIM4->CCR1=OFF;
+		l_state=LEFT_NOT_BLINKING;
+		putcharUSART3('0');
+	}else if(TIM4->CCR1==OFF){
+		TIM4->CCR1 = BLINK_DUTY;
+		l_state=LEFT_BLINKING;
+		putcharUSART3('L');
+	}
 }
 void light_on(void) {
 	TIM4->CCR3 = HEAD_LIGHT_ON;	
@@ -69,8 +91,7 @@ void light_blink(void) {
 int right_status(void){
 	if((TIM4->CCR2!=0x0000)&&(TIM4->CNT < TIM4->CCR2))  
 	return 1;
-	else
-	return 0;
+	else return 0;
 }
 int left_status(void){
 	if((TIM4->CCR1!=0x0000)&&(TIM4->CNT < TIM4->CCR1))  
