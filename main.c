@@ -17,7 +17,7 @@
 
 #define IRQ_IDLE			0
 #define IRQ_DETECTED		1
-#define IRQ_WAIT4LOW		2
+#define IRQ_WAIT4HIGH		2
 #define IRQ_DEBOUNCE		3
 #define IRQ_CNT
 
@@ -35,11 +35,20 @@
 #define LIGHT_HYST 100   //light sensor hysteresis
 uint16_t light_ref_on=3000;  // ref value on 
 uint16_t light_ref_blink=2000; //ref value blink
+uint8_t brake=0;
 
+uint8_t brake_state=OFF;
+uint8_t brake_cng=NO_CHANGE;
 
 volatile uint32_t g_irq_cnt = 0;
 volatile uint8_t g_gpiod_irq_state = (IRQ_IDLE);
 volatile uint32_t g_irq_timer = 0;
+
+uint32_t debounce_r =0;
+uint32_t debounce_l =0;
+uint32_t debounce_b_r =0;
+uint32_t debounce_b_l = 0;
+
 uint8_t reMode=SCROLL;
 uint8_t getNumLenght(int);
 void printNumLCD(int line,int pos,int x);
@@ -47,7 +56,9 @@ void printNumLCD(int line,int pos,int x);
 uint8_t status_r=0;
 uint8_t status_l=0;
 
+
 int main(void){
+	
 	
 	//######## LCD simulation #####################
 		
@@ -114,6 +125,30 @@ int main(void){
 	NVIC_EnableIRQ(EXTI0_IRQn);
 	//######################################################
 	
+	//################## PBTN CONFIG - RIGHT BRAKE  ########             //PD3
+	
+	GPIOD->PUPDR |= GPIO_PUPDR_PUPDR3_1;                                 //Pull down
+	SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI3_PD;
+	EXTI->IMR |= EXTI_IMR_MR3;											// enable interrupt on EXTI_Line0
+	EXTI->EMR &= ~EXTI_EMR_MR3;											// disable event on EXTI_Line0
+	EXTI->RTSR |= EXTI_RTSR_TR3;	
+	EXTI->FTSR |= EXTI_FTSR_TR3;
+	
+	NVIC_EnableIRQ(EXTI3_IRQn);
+	//######################################################
+	
+	//################## PBTN CONFIG - LEFT BRAKE  ########             //PD4
+	
+	GPIOD->PUPDR |= GPIO_PUPDR_PUPDR4_1;                                 //Pull down
+	SYSCFG->EXTICR[1] |= SYSCFG_EXTICR2_EXTI4_PD;
+	EXTI->IMR |= EXTI_IMR_MR4;											// enable interrupt on EXTI_Line0
+	EXTI->EMR &= ~EXTI_EMR_MR4;											// disable event on EXTI_Line0
+	EXTI->RTSR |= EXTI_RTSR_TR4;	
+	EXTI->FTSR |= EXTI_FTSR_TR4;
+	
+	NVIC_EnableIRQ(EXTI4_IRQn);
+	//######################################################
+	
 	//######### SPEED SENSOR INIT #################
 	initSPEED();
 	//#############################################
@@ -144,6 +179,9 @@ int main(void){
    
    //#############################################
 	
+
+	
+	
 	uint8_t state=0;
 	uint8_t chg=0;
 	//uint8_t speed=17;
@@ -164,15 +202,100 @@ int main(void){
 	delay_ms(3000);
 	
 	
+	
+	debounce_r = getSYSTIMER();
+	debounce_l = getSYSTIMER();
+	debounce_b_l = getSYSTIMER();
+	debounce_b_r = getSYSTIMER();
+	
+	putcharUSART3('0');
+	
 	while(1){
-	    
+		
+		
+		//################# PBTN RIGHT DEBOUNCE ########################
+	
+		if(chk4TimeoutSYSTIMER(debounce_r,300)==SYSTIMER_TIMEOUT){
+				EXTI->IMR |= EXTI_IMR_MR0;
+		}
+
+		//##############################################################
+		
+		//################# PBTN LEFT DEBOUNCE ########################
+	
+		if(chk4TimeoutSYSTIMER(debounce_l,300)==SYSTIMER_TIMEOUT){
+			EXTI->IMR |= EXTI_IMR_MR2;
+		}
+
+		//##############################################################
+		
+		
+			if(brake_state==ON && brake_cng==CHANGED){
+			putcharUSART3('B');
+			brake_cng=NO_CHANGE;
+		}else if (brake_state==OFF && brake_cng==CHANGED){
+				putcharUSART3('0');
+				delay_ms(10);
+				if(l_state==LEFT_BLINKING)
+					putcharUSART3('L');
+				else if(r_state==RIGHT_BLINKING) putcharUSART3('R');
+				brake_cng=NO_CHANGE;
+		}	
+		
+		
+		//################# BRAKE RIGHT DEBOUNCE ########################
+	
+		//if(chk4TimeoutSYSTIMER(debounce_b_r,50)==SYSTIMER_TIMEOUT){
+			//if(((GPIOD->IDR & 0x0008)== 0x0000) || (GPIOD->IDR & 0x0008)==0x0000)
+			//{
+				//if(brake_state != ON){
+					
+					//brake_state = ON;
+					//brake_cng=CHANGED;
+				//}
+			//} else if((GPIOD->IDR & 0x0008)== 0x0008){
+				//if(brake_state != OFF){
+				//brake_state = OFF;
+				//brake_cng=CHANGED;
+				//}
+			//}
+				
+			//EXTI->IMR |= EXTI_IMR_MR3;
+		//}
+
+		//##############################################################
+		
+		//################# BRAKE LEFT DEBOUNCE ########################
+	
+		if(chk4TimeoutSYSTIMER(debounce_b_l,50)==SYSTIMER_TIMEOUT && chk4TimeoutSYSTIMER(debounce_b_r,50)==SYSTIMER_TIMEOUT ){
+			if(((GPIOD->IDR & 0x0010)== 0x0000) || ((GPIOD->IDR & 0x0008)==0x0000))
+			{
+				if(brake_state != ON){
+					
+					brake_state = ON;
+					brake_cng=CHANGED;
+				}
+			} else if(((GPIOD->IDR & 0x0010)== 0x0010) && ((GPIOD->IDR & 0x0008)==0x0008)){
+				if(brake_state != OFF){
+				brake_state = OFF;
+				brake_cng=CHANGED;
+				}
+			}
+			EXTI->IMR |= EXTI_IMR_MR3;
+			EXTI->IMR |= EXTI_IMR_MR4;
+		}
+         
+		//##############################################################		
+		
+	
 			
-			if(reMode==SCROLL){int tmp=state;
-			state+=getRotEnc();
-			if(state>=10) state=9;
-			else if(state<=0) state=1;
-			if(state!=tmp){
-				chg=CHANGED;
+			if(reMode==SCROLL){
+				int tmp=state;
+					state+=getRotEnc();
+				if(state>=10) state=9;
+				else if(state<=0) state=1;
+				if(state!=tmp){
+					chg=CHANGED;
 			}
 			}
 	    
@@ -710,6 +833,7 @@ void EXTI1_IRQHandler(void)
 		if
 		(reMode==SCROLL) reMode=ADJUST;
 			else if(reMode==ADJUST) reMode=SCROLL;
+		g_gpiod_irq_state=IRQ_DETECTED;
 		EXTI->PR = EXTI_PR_PR1;											// clear EXTI_Line1 interrupt flag
 	}
 }
@@ -718,17 +842,42 @@ void EXTI0_IRQHandler(void)
 {// with sudo 
 	if((EXTI->PR & EXTI_PR_PR0) == EXTI_PR_PR0)							// EXTI_Line0 interrupt pending?
 	{
-		right_blinker();
-		EXTI->PR = EXTI_PR_PR0;											// clear EXTI_Line0 interrupt flag
+		EXTI->IMR &= ~EXTI_IMR_MR0;
+			right_blinker();
+			brake_cng=CHANGED;
+		debounce_r = getSYSTIMER();
+		EXTI->PR |= EXTI_PR_PR0;											// clear EXTI_Line0 interrupt flag
 	}
 }
 
 void EXTI2_IRQHandler(void)
 {// with sudo 
 	if((EXTI->PR & EXTI_PR_PR2) == EXTI_PR_PR2)							// EXTI_Line2 interrupt pending?
-	{
-		left_blinker();
+	{	
+		EXTI->IMR &= ~EXTI_IMR_MR2;
+			left_blinker();
+			brake_cng=CHANGED;
+		debounce_l = getSYSTIMER();
 		EXTI->PR = EXTI_PR_PR2;											// clear EXTI_Line2 interrupt flag
+	}
+}
+
+void EXTI3_IRQHandler(void)
+{// with sudo 
+	if((EXTI->PR & EXTI_PR_PR3) == EXTI_PR_PR3)							// EXTI_Line3 interrupt pending?
+	{	
+		EXTI->IMR &= ~EXTI_IMR_MR3;
+		debounce_b_r = getSYSTIMER();
+		EXTI->PR = EXTI_PR_PR3;											// clear EXTI_Line3 interrupt flag
+	}
+}
+void EXTI4_IRQHandler(void)
+{// with sudo 
+	if((EXTI->PR & EXTI_PR_PR4) == EXTI_PR_PR4)							// EXTI_Line4 interrupt pending?
+	{	
+		EXTI->IMR &= ~EXTI_IMR_MR4;
+		debounce_b_l = getSYSTIMER();
+		EXTI->PR = EXTI_PR_PR4;											// clear EXTI_Line4 interrupt flag
 	}
 }
 
@@ -742,12 +891,12 @@ void serviceIRQD(void)
 		}
 		case(IRQ_DETECTED):
 		{	
-			g_gpiod_irq_state = (IRQ_WAIT4LOW); 
+			g_gpiod_irq_state = (IRQ_WAIT4HIGH); 
 			break;
 		}
-		case(IRQ_WAIT4LOW):
+		case(IRQ_WAIT4HIGH):
 		{
-			if((GPIOD->IDR & 0x0002) == 0x0002)
+			if(((GPIOD->IDR & 0x0002) == 0x0002))
 			{
 				g_gpiod_irq_state = (IRQ_DEBOUNCE);
 				g_irq_timer = getSYSTIMER(); 
@@ -756,7 +905,7 @@ void serviceIRQD(void)
 		}
 		case(IRQ_DEBOUNCE):
 		{
-			if(chk4TimeoutSYSTIMER(g_irq_timer, 300000) == (SYSTIMER_TIMEOUT)) // 150 ms 
+			if(chk4TimeoutSYSTIMER(g_irq_timer, 500) == (SYSTIMER_TIMEOUT)) 
 			{
 				g_gpiod_irq_state = (IRQ_IDLE); 
 			}
