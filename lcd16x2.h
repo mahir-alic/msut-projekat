@@ -6,6 +6,8 @@
 #include "misc.h"
 #include "i2c.h"
 #include <stdarg.h>
+#include "math.h"
+#include "delay.h"
 
 #define addr 0x4E
 

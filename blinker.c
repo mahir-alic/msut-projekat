@@ -3,7 +3,7 @@
 
 #define OFF 0
 #define BLINK_DUTY 800
-#define HEAD_LIGHT_BLINK 400
+#define HEAD_LIGHT_BLINK 200
 #define HEAD_LIGHT_ON 1601
 
 
@@ -60,10 +60,12 @@ void right_blinker(void) {
 	if(TIM4->CCR2==BLINK_DUTY){
 		TIM4->CCR2=OFF;
 		r_state=RIGHT_NOT_BLINKING;
+		l_state=LEFT_NOT_BLINKING;
 		putcharUSART3('0');
 	}else if(TIM4->CCR2==OFF){
 		TIM4->CCR2 = BLINK_DUTY;
 		r_state=RIGHT_BLINKING;
+		l_state=LEFT_NOT_BLINKING; //bug
 		putcharUSART3('R');
 	}
 }
@@ -72,10 +74,12 @@ void left_blinker(void) {
 	if(TIM4->CCR1==BLINK_DUTY){
 		TIM4->CCR1=OFF;
 		l_state=LEFT_NOT_BLINKING;
+		r_state=RIGHT_NOT_BLINKING;
 		putcharUSART3('0');
 	}else if(TIM4->CCR1==OFF){
 		TIM4->CCR1 = BLINK_DUTY;
-		l_state=LEFT_BLINKING;
+		l_state=LEFT_BLINKING; 
+		r_state=RIGHT_NOT_BLINKING; //bug
 		putcharUSART3('L');
 	}
 }

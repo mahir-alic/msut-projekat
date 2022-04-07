@@ -9,6 +9,17 @@
 #include "adc.h"
 #include "dht11.h"
 #include "blinker.h"
+#include "flash.h"
+#include "math.h"
+
+
+// #define RADIUS_ADDRESS 0x080E0000
+// #define BLINK_ADDRESS 0x080E0004
+// #define ON_ADDRESS 0x080E0008
+
+#define RADIUS_ADDRESS 0x0800C000 // sector 3
+#define BLINK_ADDRESS 0x0800C004
+#define ON_ADDRESS 0x0800C008 
 
 #define SCROLL 0
 #define ADJUST 1
@@ -22,6 +33,7 @@
 #define IRQ_WAIT4LOW		4
 #define IRQ_FALLING_EDGE	5
 #define IRQ_RISING_EDGE		6
+#define IRQ_DEBOUNCE_HIGH	7
 #define IRQ_CNT
 
 
@@ -74,6 +86,12 @@ void printNumLCD(int line,int pos,int x);
 
 uint8_t status_r=0;
 uint8_t status_l=0;
+
+
+
+int prev_speed=0;
+float prev_distance=0.0;
+int prev_temp=0;
 
 
 int main(void){
@@ -168,13 +186,17 @@ int main(void){
 	NVIC_EnableIRQ(EXTI4_IRQn);
 	//######################################################
 	
+
+	
+	initSYSTIMER();
+
+
 	//######### SPEED SENSOR INIT #################
-	initSPEED();
+	 initSPEED();
 	//#############################################
 	
 	
-	uint32_t led_timer;
-	initSYSTIMER();
+	
 
     
     //#############################################
@@ -201,18 +223,19 @@ int main(void){
 
 	
 	
-	uint8_t state=0;
-	uint8_t chg=0;
-	//uint8_t speed=17;
-	//uint32_t distance=12000;
+	uint8_t state=3;
+	
+	
 	int temperature=0;
 	uint32_t temp_time=getSYSTIMER();
-	//uint16_t radius=0;
+	
 	uint32_t light=0;
 	uint8_t adc_cnt=0;
 	uint8_t light_state=0;
 	uint8_t light_mode=OFF;
 	int max_speed=0;
+	uint8_t chg=CHANGED;
+	
 	clearLCD();
 	delay_ms(100);
 	
@@ -223,8 +246,21 @@ int main(void){
 	
 	
 	putcharUSART3('0');
+
+
+
+	
+	
+	radius=readFlash(RADIUS_ADDRESS);
+	setNCirc(radius);					
+	light_ref_on=readFlash(ON_ADDRESS);
+	light_ref_blink=readFlash(BLINK_ADDRESS);
+
+	tim_irq_state=TIM_IRQ_IDLE; // mask interrupt
 	
 	while(1){
+		
+		
 		
 		
 		
@@ -286,6 +322,18 @@ int main(void){
 				
 			}
 			else if(state==3){
+
+				if(radius!=readFlash(RADIUS_ADDRESS)){
+					unlockFlash();
+					eraseFlash();
+
+					write2Flash(RADIUS_ADDRESS,radius);
+					write2Flash(BLINK_ADDRESS,light_ref_blink);
+					write2Flash(ON_ADDRESS,light_ref_on);
+					lockFlash();
+					setNCirc(radius);
+				}
+				speed=0;
 				posCursor(1,1);
 				eraseNChar(16);
 				posCursor(2,1);
@@ -295,6 +343,7 @@ int main(void){
 				printNumLCD(1,12,max_speed);
 				posCursor(2,1);
 				printLCD("SPEED:");
+				printNumLCD(2,10,speed);
 				posCursor(2,12);
 				printLCD("kph");
 				
@@ -306,11 +355,12 @@ int main(void){
 				eraseNChar(16);
 				posCursor(1,4);
 				printLCD("D:");
-				printNumLCD(1,11,distance);
+				printNumLCD(1,11,(distance*n_circ)/1000);
 				posCursor(1,13);
 				printLCD("m");
 				posCursor(2,1);
 				printLCD("SPEED:");
+				printNumLCD(2,10,speed);
 				posCursor(2,12);
 				printLCD("kph");
 				
@@ -336,9 +386,22 @@ int main(void){
 				printLCD("C");
 				posCursor(2,1);
 				printLCD("SPEED:");
+				printNumLCD(2,10,speed);
 				posCursor(2,12);
 				printLCD("kph");
-			}else if(state==6){ //ovdje dodat
+			}else if(state==6){ 
+
+				if(light_ref_blink!=readFlash(RADIUS_ADDRESS) || light_ref_on != readFlash(ON_ADDRESS)){
+					unlockFlash();
+					eraseFlash();
+
+					write2Flash(RADIUS_ADDRESS,radius);
+					write2Flash(BLINK_ADDRESS,light_ref_blink);
+					write2Flash(ON_ADDRESS,light_ref_on);
+					lockFlash();
+				
+				}
+
 				posCursor(1,1);
 				eraseNChar(16);
 				posCursor(2,1);
@@ -346,20 +409,17 @@ int main(void){
 				posCursor(1,4);
 				printLCD("LIGHT MODE");
 				if(light_mode==LIGHT_MODE_OFF){
-							//posCursor(2,1);
-							//eraseNChar(16);
+							
 							posCursor(2,7);
 							printLCD("OFF");
 						}
 						if(light_mode==LIGHT_MODE_ON){
-							//posCursor(2,1);
-							//eraseNChar(16);
+							
 							posCursor(2,8);
 							printLCD("ON");
 						}
 						if(light_mode==LIGHT_MODE_AUTO){
-							//posCursor(2,1);
-							//eraseNChar(16);
+							
 							posCursor(2,7);
 							printLCD("AUTO");
 						}
@@ -386,6 +446,17 @@ int main(void){
 				printLCD("ON:");
 				printNumLCD(2,8,light_ref_on);
 			}else if(state==9){
+
+				if((light_ref_blink!=readFlash(RADIUS_ADDRESS)) || (light_ref_on != readFlash(ON_ADDRESS))){
+					unlockFlash();
+					eraseFlash();
+					write2Flash(RADIUS_ADDRESS,radius);
+					write2Flash(BLINK_ADDRESS,light_ref_blink);
+					write2Flash(ON_ADDRESS,light_ref_on);
+					lockFlash();
+					
+				}
+
 				posCursor(1,1);
 				eraseNChar(16);
 				posCursor(1,6);
@@ -438,16 +509,26 @@ int main(void){
 				}
 			}
 			else if(state==3){
-				posCursor(2,7);
-				eraseNChar(4);
+				
+			
 				if(chk4TimeoutSYSTIMER(speedTimeOut,3000)==SYSTIMER_TIMEOUT) {
 					speed=0;
 					TIM4->CNT = 0;
 					speedTimeOut=getSYSTIMER();
 				}
-				printNumLCD(2,10,speed);
-				if(max_speed<speed) max_speed=speed;
-				printNumLCD(1,12,max_speed);
+				
+				if(prev_speed!=speed){
+					posCursor(2,7);
+					eraseNChar(4);
+					printNumLCD(2,10,speed);
+					if(max_speed<speed) max_speed=speed;
+				
+					posCursor(1,9);
+					eraseNChar(4);
+					printNumLCD(1,12,max_speed);
+					prev_speed=speed;
+				}
+				
 				int tmp=right_status();
 				if(tmp!=status_r){
 					status_r=tmp;
@@ -484,18 +565,29 @@ int main(void){
 			    }
 				
 			}else if(state==4){
-				posCursor(1,7);
-				eraseNChar(5);
-				printNumLCD(1,11,(int)distance);
-				posCursor(2,7);
-				eraseNChar(4);
+				if(prev_distance != distance){
+					
+					posCursor(1,7);
+					eraseNChar(5);
+					printNumLCD(1,11,(int)(distance*n_circ)/1000);
+					prev_distance = distance;
+				}
+				
 				if(chk4TimeoutSYSTIMER(speedTimeOut,3000)==SYSTIMER_TIMEOUT) {
 					speed=0;
 					TIM4->CNT = 0;
 					speedTimeOut=getSYSTIMER();
 				}
-				printNumLCD(2,10,speed);
-				if(max_speed<speed) max_speed=speed;
+				
+				if(prev_speed!=speed){
+					posCursor(2,7);
+					eraseNChar(4);
+					printNumLCD(2,10,speed);
+					if(max_speed<speed) max_speed=speed;
+					prev_speed=speed;
+				}
+				
+					
 				
 				int tmp=right_status();
 				if(tmp!=status_r){
@@ -533,25 +625,34 @@ int main(void){
 			    }
 				
 			}else if(state==5){
-				posCursor(1,9);
-				eraseNChar(3);
-				if(temperature>0){
-					posCursor(1,11-getNumLenght(temperature));
-					printLCD("+");	
-					printNumLCD(1,11,temperature);
+				if(prev_temp != temperature){
+					posCursor(1,9);
+					eraseNChar(3);
+					if(temperature>0){
+						posCursor(1,11-getNumLenght(temperature));
+						printLCD("+");	
+						printNumLCD(1,11,temperature);
+					}
+					else if(temperature<=0){
+						printNumLCD(1,11,temperature);
+					}
+					prev_temp=temperature;
 				}
-				else if(temperature<=0){
-					printNumLCD(1,11,temperature);
-				}
-				posCursor(2,7);
-				eraseNChar(4);
+				
+				
 				if(chk4TimeoutSYSTIMER(speedTimeOut,3000)==SYSTIMER_TIMEOUT) {
 					speed=0;
 					TIM4->CNT = 0;
 					speedTimeOut=getSYSTIMER();
 				}
-				printNumLCD(2,10,speed);
-				if(max_speed<speed) max_speed=speed;
+				
+				if(prev_speed!=speed){
+					posCursor(2,7);
+					eraseNChar(4);
+					printNumLCD(2,10,speed);
+					if(max_speed<speed) max_speed=speed;
+					prev_speed=speed;
+				}
 				
 				int tmp=right_status();
 				if(tmp!=status_r){
@@ -686,8 +787,8 @@ int main(void){
 						speed=0;
 						max_speed=0;
 						distance=0;
-						light_ref_on=3000;  
-						light_ref_blink=2000; 
+						//light_ref_on=3000;  
+						//light_ref_blink=2000; 
 						state=3;
 						reMode=SCROLL;
 						
@@ -727,6 +828,8 @@ int main(void){
 		serviceIRQD0();
 		serviceIRQD4();
 		serviceIRQD3();
+
+		
 		
 		//######################## LIHGT ################################
 		
@@ -769,6 +872,7 @@ int main(void){
 	}
 	  
 	  //###############################################################
+		
 		
 	} //while end
 }// main end
@@ -888,12 +992,19 @@ void serviceIRQD2(void){
 		{
 			break;
 		}
-		case(IRQ_DETECTED):
-		{	
-			if(brake_left==OFF && brake_right==OFF){
-				left_blinker();
+		case (IRQ_DETECTED):
+		{
+			g_irq_timer2=getSYSTIMER();
+			g_gpiod2_irq_state= IRQ_DEBOUNCE_HIGH;
+			break;
+		}
+		case(IRQ_DEBOUNCE_HIGH):
+		{	if(chk4TimeoutSYSTIMER(g_irq_timer2,20)==SYSTIMER_TIMEOUT){
+				if(brake_left==OFF && brake_right==OFF && ((GPIOD->IDR & 0x0004)==0x0004)){
+					left_blinker();
+				}
+				g_gpiod2_irq_state = (IRQ_WAIT4LOW); 
 			}
-			g_gpiod2_irq_state = (IRQ_WAIT4LOW); 
 			break;
 		}
 		case(IRQ_WAIT4LOW):
@@ -930,12 +1041,19 @@ void serviceIRQD0(void){
 			break;
 		}
 		case(IRQ_DETECTED):
+		{
+			g_irq_timer0 = getSYSTIMER();
+			g_gpiod0_irq_state = IRQ_DEBOUNCE_HIGH;
+			break;
+		}
+		case(IRQ_DEBOUNCE_HIGH):
 		{	
-			
-			if(brake_left==OFF && brake_right==OFF){
-				right_blinker();
+			if(chk4TimeoutSYSTIMER(g_irq_timer0,20)==SYSTIMER_TIMEOUT){
+				if(brake_left==OFF && brake_right==OFF && (GPIOD->IDR & 0x0001)==0x0001){
+					right_blinker();
+				}
+				g_gpiod0_irq_state = (IRQ_WAIT4LOW); 
 			}
-			g_gpiod0_irq_state = (IRQ_WAIT4LOW); 
 			break;
 		}
 		case(IRQ_WAIT4LOW):
@@ -1071,6 +1189,7 @@ void serviceIRQD3(void){
 		}
 	}
 }
+
 
 uint8_t getNumLenght(int y){
 	int x=abs(y);

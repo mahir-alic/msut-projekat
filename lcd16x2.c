@@ -1,7 +1,6 @@
 #include "lcd16x2.h"
 
 
-
 uint8_t ddram_addr=0x00;
 
 void initLCD(){
